@@ -1,0 +1,4 @@
+jupyterlab==4.3.5
+nltk==3.9.1
+numpy==2.0.2
+pandas==2.2.3
