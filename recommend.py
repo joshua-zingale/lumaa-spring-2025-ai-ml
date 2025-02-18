@@ -10,54 +10,20 @@
 # In[1]:
 
 
+
+from nltk.stem import PorterStemmer
 import pandas as pd
+import numpy as np
+import sys
+
 pd.options.mode.copy_on_write = True
 
-# Load only smaller subset of the movies per the instructions
-df = pd.read_csv("data/movie_dataset.csv").sample(500, random_state = 115)
+ps = PorterStemmer()
 
-# View a small random sample to get a feel for the data
-df.sample(3, random_state = 935)
-
-
-# In[2]:
-
-
-df.columns
-
-
-# ### Choosing Columns
-# Looking at the column names and some examples, the most immediately relevant columns for this challenge seem to be "genres", "keywords", "original_title", and "overview", though other columns could be used to improve relevancy. Also, I am going to filter the data only to include those movies originally in English.
-
-# In[3]:
-
-
-# Load the most relevant columns for all movies in the English language, dropping any rows with NaN values
-df = df[df["original_language"] == "en"][["index", "genres", "keywords", "original_title", "overview"]].dropna()
-
-print(len(df))
-
-
-# In[4]:
-
-
-df.sample(3, random_state=115)
-
-
-# ### Combining Columns
-# Fortunately, most of the data are English movies so I retained enough data. To finish cleaning the data, I now will concatenate genres, the keywords, and the film overview into a single column, which will later be turned into a vector.
-
-# In[5]:
-
-
-# Build a new DataFrame with a composite "desription" column
-df["description"] = df["original_title"] + " " + df["genres"] + " " + df["keywords"] + " " + df["overview"]
-
-
-# In[6]:
-
-
-df.sample(3, random_state = 935)
+# Load in the stopwords list
+with open("stopwords.txt") as f:
+    stopwords = f.read().split()
+stopwords = set(stopwords)
 
 
 # ## Vectorized Movie Storage
@@ -70,26 +36,6 @@ df.sample(3, random_state = 935)
 # 
 # When vectorizing a query, any word following I is removed to prevent "love" in constructions like "I love horrific war films" from biasing the results toward romantic comedies.
 # 
-
-# In[7]:
-
-
-from nltk.stem import PorterStemmer
-import numpy as np
-ps = PorterStemmer()
-
-
-# In[8]:
-
-
-# Load in the stopwords list
-with open("stopwords.txt") as f:
-    stopwords = f.read().split()
-stopwords = set(stopwords)
-
-
-# In[9]:
-
 
 class Tokenizer():
     def __init__(self, documents):
@@ -154,7 +100,6 @@ class Tokenizer():
         return words
 
 
-# In[10]:
 
 
 class VectorDB():
@@ -197,103 +142,74 @@ class VectorDB():
             return self.data.iloc[top_idc], scores[top_idc]
         return self.data.iloc[top_idc]
 
+def main():
 
-# In[11]:
-
-
-# Get a Tokenizer for the data
-tokenizer = Tokenizer(df.loc[:, "description"])
-
-print(f"The vocabulary has {tokenizer.vocabulary_size} words")
-
-
-# In[12]:
-
-
-# Create the vectorized database
-db = VectorDB(df, embedded_row = "description", embedding_function = tokenizer.vectorize)
-
-
-# In[13]:
-
-
-def vectorize_query(text):
-    """Vectorizes a search query"""
-
-    words = text.lower().split()
-    new_words = [words[0]]
-    # Remove any word the follows "I"
-    for prev_word, word in zip(words[:-1], words[1:]):
-        if prev_word != "i":
-            new_words.append(word)
-
-    text = " ".join(new_words)
+    if len(sys.argv) != 2:
+        raise Exception("There must be a single argument, the search query.")
     
-    return tokenizer.vectorize(text)
+    # Load only smaller subset of the movies per the instructions
+    df = pd.read_csv("data/movie_dataset.csv").sample(500, random_state = 115)
+    
+    # ### Choosing Columns
+    # Looking at the column names and some examples, the most immediately relevant columns for this challenge seem to be "genres", "keywords", "original_title", and "overview", though other columns could be used to improve relevancy. Also, I am going to filter the data only to include those movies originally in English.
+    
+    
+    # Load the most relevant columns for all movies in the English language, dropping any rows with NaN values
+    df = df[df["original_language"] == "en"][["index", "genres", "keywords", "original_title", "overview"]].dropna()
+    
+    # ### Combining Columns
+    # Fortunately, most of the data are English movies so I retained enough data. To finish cleaning the data, I now will concatenate genres, the keywords, and the film overview into a single column, which will later be turned into a vector.
+    
+    # Build a new DataFrame with a composite "desription" column
+    df["description"] = df["original_title"] + " " + df["genres"] + " " + df["keywords"] + " " + df["overview"]
 
 
-# ## Testing
-
-# In[14]:
 
 
-def search(text, k = 5):
-    rows, scores = db.search(vectorize_query(text), k = k, return_similarities = True)
-
-    print("Results the following query:", text)
-    for row, score in zip(rows.iloc, scores):
-        title = row["original_title"]
-        index = row["index"]
-        overview = row["overview"]
-        keywords = row["keywords"]
-        genres = row["genres"]
-        print(f"Title: {title} ({index})\nCosine Similarity {score}\nKeywords & Genres: {keywords}, {genres}\nOverview: {overview}\n")
 
 
-# In[15]:
 
 
-search("I love thrilling action movies set in space, with a comedic twist.")
+
+    # Get a Tokenizer for the data
+    tokenizer = Tokenizer(df.loc[:, "description"])
+    
+    
+    
+    
+    # Create the vectorized database
+    db = VectorDB(df, embedded_row = "description", embedding_function = tokenizer.vectorize)
+    
+    
+    
+    
+    def vectorize_query(text):
+        """Vectorizes a search query"""
+    
+        words = text.lower().split()
+        new_words = [words[0]]
+        # Remove any word the follows "I"
+        for prev_word, word in zip(words[:-1], words[1:]):
+            if prev_word != "i":
+                new_words.append(word)
+    
+        text = " ".join(new_words)
+        
+        return tokenizer.vectorize(text)
+    
+    
+    def search(text, k = 5):
+        rows, scores = db.search(vectorize_query(text), k = k, return_similarities = True)
+        for row, score in zip(rows.iloc, scores):
+            title = row["original_title"]
+            index = row["index"]
+            overview = row["overview"]
+            keywords = row["keywords"]
+            genres = row["genres"]
+            print(f"Title: {title} ({index})\nCosine Similarity {score}\nKeywords & Genres: {keywords}, {genres}\nOverview: {overview}\n")
 
 
-# In[16]:
+    search(sys.argv[1])
 
-
-search("I like action movies set in space")
-
-
-# In[17]:
-
-
-search("I like movies that are informative and teach me something")
-
-
-# In[18]:
-
-
-search("I like calm documentaries about nature.")
-
-
-# In[19]:
-
-
-search("I like calm documentaries about war.")
-
-
-# In[20]:
-
-
-search("I love comedies for the family")
-
-
-# In[21]:
-
-
-search("I love comedies")
-
-
-# In[22]:
-
-
-search("I like horror films that take place in the wild")
-
+if __name__ == "__main__":
+    main()
