@@ -7,8 +7,8 @@ This is Joshua Zingale's submition for Lumaa's recommender challenge. I used TF-
 I used a subset of this [kaggle dataset](https://www.kaggle.com/datasets/utkarshx27/movies-dataset?resource=download). I formed the subset by randomly (with a seed for reproducibility) sampling 500 rows from the dataset. I have included this dataset in "data/movie_dataset.csv". The included Jupyter Notebook and Python script load the data without need of modification.
 
 ## Setup
-Python version: Python 3.9.6
-Run `pip install -r requirements.txt`
+- Python version: Python 3.9.6
+- Run `pip install -r requirements.txt`
 
 ## Running
 Using Jupyter Lab, you can open "data_challenge.ipynb" to see the code for this submission. In addition, at the bottom of the notebook are various example search queries. A new query may be made by adding a line that reads `search("your search query here")`.
